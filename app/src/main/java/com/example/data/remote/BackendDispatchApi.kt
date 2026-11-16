@@ -69,9 +69,9 @@ class BackendDispatchClient {
         .build()
 
     private val baseUrl: String = BuildConfig.BACKEND_BASE_URL
-        .takeIf { it.startsWith("http") }
+        .takeIf { it.isNotBlank() && it != "https://api.safeguard-sos.example.com" }
         ?.let { if (it.endsWith("/")) it else "$it/" }
-        ?: "https://api.safeguard-sos.example.com/"
+        ?: "https://ais-dev-c7y2kzcnykaotqnojb4vh2-53089186225.asia-east1.run.app/"
 
     private val api: BackendDispatchService by lazy {
         Retrofit.Builder()

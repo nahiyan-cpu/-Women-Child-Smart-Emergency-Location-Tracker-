@@ -23,7 +23,7 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     manifestPlaceholders["MAPS_API_KEY"] =
-      System.getenv("MAPS_API_KEY") ?: "MY_MAPS_API_KEY"
+      System.getenv("MAPS_API_KEY") ?: "AIzaSyDummyMapsApiKeyForSafeGuardDemo"
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
