@@ -1,0 +1,243 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private authenticated user profile and safety preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "displayName": { "type": "string", "description": "User full or preferred name." },
+        "email": { "type": "string", "description": "User email address." },
+        "phone": { "type": "string", "description": "User phone number." },
+        "bloodType": { "type": "string", "description": "Medical blood group." },
+        "medicalNotes": { "type": "string", "description": "Allergies or medical emergency notes." },
+        "homeAddress": { "type": "string", "description": "Optional home address." },
+        "emergencyPinHash": { "type": "string", "description": "SHA-256 hash of optional cancel PIN." },
+        "sosAutoSiren": { "type": "boolean", "description": "Whether SOS automatically sounds the siren." },
+        "locationSharingEnabled": { "type": "boolean", "description": "Whether live beacon sharing is enabled." },
+        "fcmToken": { "type": "string", "description": "Optional FCM device registration token." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "displayName", "sosAutoSiren", "locationSharingEnabled", "createdAt", "updatedAt"]
+    },
+    "EmergencyContact": {
+      "title": "EmergencyContact",
+      "description": "Trusted emergency contact belonging to a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "name": { "type": "string", "description": "Contact name." },
+        "relationship": { "type": "string", "description": "Relationship label (Mother, Guardian, Friend)." },
+        "phone": { "type": "string", "description": "Contact phone number." },
+        "email": { "type": "string", "description": "Optional contact email." },
+        "isPrimary": { "type": "boolean", "description": "Primary SOS contact flag." },
+        "notifyOnSos": { "type": "boolean", "description": "Notify on SOS trigger." },
+        "notifyOnGeofence": { "type": "boolean", "description": "Notify on geofence exit/enter." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "name", "relationship", "phone", "isPrimary", "notifyOnSos", "notifyOnGeofence", "createdAt", "updatedAt"]
+    },
+    "SafetyGeofence": {
+      "title": "SafetyGeofence",
+      "description": "User-configured safe zone or restricted area geofence.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "name": { "type": "string", "description": "Geofence label (Home, School, Work)." },
+        "zoneType": { "type": "string", "enum": ["safe_zone", "restricted_zone"], "description": "Type of geofence." },
+        "latitude": { "type": "number", "description": "Center latitude." },
+        "longitude": { "type": "number", "description": "Center longitude." },
+        "radiusMeters": { "type": "number", "description": "Geofence radius in meters." },
+        "isActive": { "type": "boolean", "description": "Whether monitoring is active." },
+        "notifyOnEnter": { "type": "boolean", "description": "Alert on entering zone." },
+        "notifyOnExit": { "type": "boolean", "description": "Alert on exiting zone." },
+        "lastEvent": { "type": "string", "enum": ["none", "entered", "exited"], "description": "Last transition event." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "name", "zoneType", "latitude", "longitude", "radiusMeters", "isActive", "notifyOnEnter", "notifyOnExit", "lastEvent", "createdAt", "updatedAt"]
+    },
+    "SosIncident": {
+      "title": "SosIncident",
+      "description": "Private user SOS emergency incident and tracking history.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "triggerType": { "type": "string", "enum": ["one_touch_sos", "geofence_breach", "manual_check_in"], "description": "How incident started." },
+        "status": { "type": "string", "enum": ["active", "acknowledged", "resolved", "false_alarm"], "description": "Incident lifecycle status." },
+        "latitude": { "type": "number", "description": "Latest latitude." },
+        "longitude": { "type": "number", "description": "Latest longitude." },
+        "accuracyMeters": { "type": "number", "description": "GPS accuracy in meters." },
+        "addressLabel": { "type": "string", "description": "Human-readable location or coordinates summary." },
+        "sirenTriggered": { "type": "boolean", "description": "Whether audible siren was activated." },
+        "batteryPercent": { "type": "integer", "description": "Battery percentage at trigger/update." },
+        "notes": { "type": "string", "description": "Incident notes." },
+        "evidenceCount": { "type": "integer", "description": "Count of consented evidence attachments." },
+        "shareCode": { "type": "string", "description": "Live share document ID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." },
+        "resolvedAt": { "type": "string", "format": "date-time", "description": "Optional resolution server timestamp." }
+      },
+      "required": ["userId", "triggerType", "status", "latitude", "longitude", "accuracyMeters", "addressLabel", "sirenTriggered", "batteryPercent", "notes", "evidenceCount", "shareCode", "createdAt", "updatedAt"]
+    },
+    "LocationBreadcrumb": {
+      "title": "LocationBreadcrumb",
+      "description": "Append-only GPS coordinate breadcrumb during an active SOS incident.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "incidentId": { "type": "string", "description": "Parent incident document ID." },
+        "latitude": { "type": "number", "description": "Breadcrumb latitude." },
+        "longitude": { "type": "number", "description": "Breadcrumb longitude." },
+        "speedMps": { "type": "number", "description": "Speed in m/s." },
+        "accuracyMeters": { "type": "number", "description": "Accuracy in meters." },
+        "batteryPercent": { "type": "integer", "description": "Device battery percentage." },
+        "recordedAt": { "type": "string", "format": "date-time", "description": "Server timestamp when recorded." }
+      },
+      "required": ["userId", "incidentId", "latitude", "longitude", "speedMps", "accuracyMeters", "batteryPercent", "recordedAt"]
+    },
+    "EvidenceRecord": {
+      "title": "EvidenceRecord",
+      "description": "Consent-based encrypted evidence metadata captured by the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "incidentId": { "type": "string", "description": "Associated incident ID or general." },
+        "captureMode": { "type": "string", "enum": ["camera_photo", "gallery_photo", "audio_note", "text_note"], "description": "Explicit user-triggered mode." },
+        "title": { "type": "string", "description": "Evidence label." },
+        "summary": { "type": "string", "description": "Optional description or note content." },
+        "localEncryptedUri": { "type": "string", "description": "AES-256-GCM encrypted local vault path." },
+        "storagePath": { "type": "string", "description": "Optional Firebase Storage object path." },
+        "sha256Digest": { "type": "string", "description": "Integrity digest of captured payload." },
+        "encryptionAlgo": { "type": "string", "description": "Encryption algorithm identifier." },
+        "consentConfirmed": { "type": "boolean", "description": "Explicit user consent confirmation." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": ["userId", "incidentId", "captureMode", "title", "summary", "localEncryptedUri", "storagePath", "sha256Digest", "encryptionAlgo", "consentConfirmed", "createdAt"]
+    },
+    "LiveShareBeacon": {
+      "title": "LiveShareBeacon",
+      "description": "Real-time location sharing beacon accessible by share ID to signed-in responders.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "ownerAlias": { "type": "string", "description": "First name or safe display alias without PII." },
+        "incidentId": { "type": "string", "description": "Associated incident ID." },
+        "isActive": { "type": "boolean", "description": "Whether sharing is currently active." },
+        "latitude": { "type": "number", "description": "Current latitude." },
+        "longitude": { "type": "number", "description": "Current longitude." },
+        "accuracyMeters": { "type": "number", "description": "GPS accuracy." },
+        "batteryPercent": { "type": "integer", "description": "Battery percentage." },
+        "statusMessage": { "type": "string", "description": "Short status text." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["ownerId", "ownerAlias", "incidentId", "isActive", "latitude", "longitude", "accuracyMeters", "batteryPercent", "statusMessage", "createdAt", "updatedAt"]
+    },
+    "DangerZone": {
+      "title": "DangerZone",
+      "description": "Crowdsourced community safety hazard or danger zone report.",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string", "description": "Reporter Firebase Auth UID." },
+        "reporterAlias": { "type": "string", "description": "Public reporter alias." },
+        "title": { "type": "string", "description": "Short hazard title." },
+        "description": { "type": "string", "description": "Detailed hazard description." },
+        "category": { "type": "string", "enum": ["poor_lighting", "harassment", "unsafe_transit", "isolated_area", "suspicious_activity", "other"], "description": "Hazard category." },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"], "description": "Severity level." },
+        "latitude": { "type": "number", "description": "Hazard latitude." },
+        "longitude": { "type": "number", "description": "Hazard longitude." },
+        "radiusMeters": { "type": "number", "description": "Affected radius in meters." },
+        "verificationStatus": { "type": "string", "enum": ["pending", "verified", "rejected", "resolved"], "description": "Moderation status." },
+        "confirmCount": { "type": "integer", "description": "Community confirmation count." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["reporterId", "reporterAlias", "title", "description", "category", "severity", "latitude", "longitude", "radiusMeters", "verificationStatus", "confirmCount", "createdAt", "updatedAt"]
+    },
+    "SafePlace": {
+      "title": "SafePlace",
+      "description": "Verified safe haven such as police station, hospital, or 24/7 shelter.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Place name." },
+        "category": { "type": "string", "enum": ["police_station", "hospital", "shelter", "community_hub"], "description": "Safe place category." },
+        "address": { "type": "string", "description": "Street address." },
+        "phone": { "type": "string", "description": "Emergency desk phone." },
+        "latitude": { "type": "number", "description": "Latitude." },
+        "longitude": { "type": "number", "description": "Longitude." },
+        "isOpen24Hours": { "type": "boolean", "description": "24/7 availability flag." },
+        "verifiedByAdmin": { "type": "boolean", "description": "Admin verification flag." },
+        "createdBy": { "type": "string", "description": "Admin UID who registered the place." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["name", "category", "address", "phone", "latitude", "longitude", "isOpen24Hours", "verifiedByAdmin", "createdBy", "createdAt", "updatedAt"]
+    },
+    "SosGlobalAlert": {
+      "title": "SosGlobalAlert",
+      "description": "Admin dashboard emergency alert summary without private PII.",
+      "type": "object",
+      "properties": {
+        "incidentId": { "type": "string", "description": "User incident document ID." },
+        "userId": { "type": "string", "description": "User Firebase Auth UID." },
+        "userAlias": { "type": "string", "description": "Safe display alias." },
+        "triggerType": { "type": "string", "enum": ["one_touch_sos", "geofence_breach", "manual_check_in"], "description": "Trigger source." },
+        "status": { "type": "string", "enum": ["active", "acknowledged", "resolved", "false_alarm"], "description": "Alert status." },
+        "latitude": { "type": "number", "description": "Latest latitude." },
+        "longitude": { "type": "number", "description": "Latest longitude." },
+        "accuracyMeters": { "type": "number", "description": "GPS accuracy." },
+        "batteryPercent": { "type": "integer", "description": "Battery level." },
+        "sirenTriggered": { "type": "boolean", "description": "Siren active flag." },
+        "shareId": { "type": "string", "description": "Associated live share beacon ID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["incidentId", "userId", "userAlias", "triggerType", "status", "latitude", "longitude", "accuracyMeters", "batteryPercent", "sirenTriggered", "shareId", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-isolated private user profiles and safety settings."
+    },
+    "/users/{userId}/emergency_contacts/{contactId}": {
+      "schema": { "$ref": "#/entities/EmergencyContact" },
+      "description": "Owner-isolated trusted emergency contacts."
+    },
+    "/users/{userId}/geofences/{geofenceId}": {
+      "schema": { "$ref": "#/entities/SafetyGeofence" },
+      "description": "Owner-isolated geofence safe and restricted zones."
+    },
+    "/users/{userId}/sos_incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/SosIncident" },
+      "description": "Private SOS incidents and audit history for a user."
+    },
+    "/users/{userId}/sos_incidents/{incidentId}/location_breadcrumbs/{crumbId}": {
+      "schema": { "$ref": "#/entities/LocationBreadcrumb" },
+      "description": "Append-only live GPS breadcrumbs recorded during an SOS incident."
+    },
+    "/users/{userId}/evidence_records/{evidenceId}": {
+      "schema": { "$ref": "#/entities/EvidenceRecord" },
+      "description": "Consent-confirmed encrypted evidence records."
+    },
+    "/live_shares/{shareId}": {
+      "schema": { "$ref": "#/entities/LiveShareBeacon" },
+      "description": "Live location share beacons keyed by share ID."
+    },
+    "/danger_zones/{zoneId}": {
+      "schema": { "$ref": "#/entities/DangerZone" },
+      "description": "Crowdsourced danger zone reports moderated by admins."
+    },
+    "/safe_places/{placeId}": {
+      "schema": { "$ref": "#/entities/SafePlace" },
+      "description": "Admin-verified safe places for emergency navigation."
+    },
+    "/sos_global_alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/SosGlobalAlert" },
+      "description": "Sanitized SOS alert feed for responder/admin dashboard."
+    }
+  }
+}

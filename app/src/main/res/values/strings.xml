@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">SafeGuard SOS</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="sos_button_label">SOS</string>
+    <string name="sos_button_sub">TAP OR HOLD 2S</string>
+    <string name="sos_active_banner">EMERGENCY SOS ACTIVE</string>
+    <string name="consent_evidence_title">Consent-Based Evidence Capture</string>
+    <string name="consent_evidence_desc">SafeGuard never records audio or video covertly. Confirm below to capture and encrypt evidence with AES-256-GCM inside your personal vault.</string>
+    <string name="offline_banner">You appear offline. SOS &amp; evidence writes are queued locally and will sync automatically when reconnected.</string>
+    <string name="maps_key_notice">Live Google Map tiles require MAPS_API_KEY in AI Studio Secrets. Showing live GPS radar &amp; spatial coordinates.</string>
+</resources>

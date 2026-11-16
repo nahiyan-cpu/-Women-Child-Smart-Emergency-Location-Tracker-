@@ -1,0 +1,6 @@
+{
+  "name": "SafeGuard SOS",
+  "description": "Women & Child Smart Emergency & Location Tracker with one-touch SOS, real-time location sharing, geofencing, safe-place discovery, crowdsourced danger zones, and admin moderation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

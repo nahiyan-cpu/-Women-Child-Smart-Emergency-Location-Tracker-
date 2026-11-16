@@ -1,0 +1,416 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HARDENED PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        ('email_verified' in request.auth.token &&
+         request.auth.token.email_verified == true &&
+         'email' in request.auth.token &&
+         request.auth.token.email == 'nahiyanctg07@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidLatLng(lat, lng) {
+      return lat is number && lat >= -90.0 && lat <= 90.0 &&
+             lng is number && lng >= -180.0 && lng <= 180.0;
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 160)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 32)) &&
+             (!('bloodType' in data) || (data.bloodType is string && data.bloodType.size() <= 16)) &&
+             (!('medicalNotes' in data) || (data.medicalNotes is string && data.medicalNotes.size() <= 500)) &&
+             (!('homeAddress' in data) || (data.homeAddress is string && data.homeAddress.size() <= 240)) &&
+             (!('emergencyPinHash' in data) || (data.emergencyPinHash is string && data.emergencyPinHash.size() <= 128)) &&
+             data.sosAutoSiren is bool &&
+             data.locationSharingEnabled is bool &&
+             (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() <= 512)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidEmergencyContact(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.relationship is string && data.relationship.size() >= 1 && data.relationship.size() <= 40 &&
+             data.phone is string && data.phone.size() >= 3 && data.phone.size() <= 32 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 160)) &&
+             data.isPrimary is bool &&
+             data.notifyOnSos is bool &&
+             data.notifyOnGeofence is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidGeofence(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+             data.zoneType in ['safe_zone', 'restricted_zone'] &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.radiusMeters is number && data.radiusMeters >= 50 && data.radiusMeters <= 10000 &&
+             data.isActive is bool &&
+             data.notifyOnEnter is bool &&
+             data.notifyOnExit is bool &&
+             data.lastEvent in ['none', 'entered', 'exited'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSosIncident(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.triggerType in ['one_touch_sos', 'geofence_breach', 'manual_check_in'] &&
+             data.status in ['active', 'acknowledged', 'resolved', 'false_alarm'] &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.accuracyMeters is number && data.accuracyMeters >= 0 && data.accuracyMeters <= 10000 &&
+             data.addressLabel is string && data.addressLabel.size() <= 200 &&
+             data.sirenTriggered is bool &&
+             data.batteryPercent is int && data.batteryPercent >= 0 && data.batteryPercent <= 100 &&
+             data.notes is string && data.notes.size() <= 500 &&
+             data.evidenceCount is int && data.evidenceCount >= 0 && data.evidenceCount <= 100 &&
+             data.shareCode is string && data.shareCode.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             (!('resolvedAt' in data) || (data.resolvedAt is timestamp && data.resolvedAt <= request.time));
+    }
+
+    function isValidLocationBreadcrumb(data, userId, incidentId) {
+      return data.userId is string && data.userId == userId &&
+             data.incidentId is string && data.incidentId == incidentId &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.speedMps is number && data.speedMps >= 0 && data.speedMps <= 500 &&
+             data.accuracyMeters is number && data.accuracyMeters >= 0 && data.accuracyMeters <= 10000 &&
+             data.batteryPercent is int && data.batteryPercent >= 0 && data.batteryPercent <= 100 &&
+             data.recordedAt is timestamp && data.recordedAt <= request.time;
+    }
+
+    function isValidEvidenceRecord(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.incidentId is string && data.incidentId.size() >= 1 && data.incidentId.size() <= 128 &&
+             data.captureMode in ['camera_photo', 'gallery_photo', 'audio_note', 'text_note'] &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.summary is string && data.summary.size() <= 1000 &&
+             data.localEncryptedUri is string && data.localEncryptedUri.size() <= 500 &&
+             data.storagePath is string && data.storagePath.size() <= 500 &&
+             data.sha256Digest is string && data.sha256Digest.size() >= 16 && data.sha256Digest.size() <= 128 &&
+             data.encryptionAlgo is string && data.encryptionAlgo.size() >= 3 && data.encryptionAlgo.size() <= 40 &&
+             data.consentConfirmed == true &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidLiveShareBeacon(data) {
+      return data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.ownerAlias is string && data.ownerAlias.size() >= 1 && data.ownerAlias.size() <= 60 &&
+             data.incidentId is string && data.incidentId.size() >= 1 && data.incidentId.size() <= 128 &&
+             data.isActive is bool &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.accuracyMeters is number && data.accuracyMeters >= 0 && data.accuracyMeters <= 10000 &&
+             data.batteryPercent is int && data.batteryPercent >= 0 && data.batteryPercent <= 100 &&
+             data.statusMessage is string && data.statusMessage.size() <= 200 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidDangerZone(data) {
+      return data.reporterId is string && data.reporterId.size() >= 1 && data.reporterId.size() <= 128 &&
+             data.reporterAlias is string && data.reporterAlias.size() >= 1 && data.reporterAlias.size() <= 60 &&
+             data.title is string && data.title.size() >= 3 && data.title.size() <= 80 &&
+             data.description is string && data.description.size() >= 5 && data.description.size() <= 300 &&
+             data.category in ['poor_lighting', 'harassment', 'unsafe_transit', 'isolated_area', 'suspicious_activity', 'other'] &&
+             data.severity in ['low', 'medium', 'high', 'critical'] &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.radiusMeters is number && data.radiusMeters >= 50 && data.radiusMeters <= 2000 &&
+             data.verificationStatus in ['pending', 'verified', 'rejected', 'resolved'] &&
+             data.confirmCount is int && data.confirmCount >= 0 && data.confirmCount <= 1000000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSafePlace(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+             data.category in ['police_station', 'hospital', 'shelter', 'community_hub'] &&
+             data.address is string && data.address.size() >= 3 && data.address.size() <= 200 &&
+             data.phone is string && data.phone.size() >= 3 && data.phone.size() <= 32 &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.isOpen24Hours is bool &&
+             data.verifiedByAdmin is bool &&
+             data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSosGlobalAlert(data) {
+      return data.incidentId is string && data.incidentId.size() >= 1 && data.incidentId.size() <= 128 &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userAlias is string && data.userAlias.size() >= 1 && data.userAlias.size() <= 60 &&
+             data.triggerType in ['one_touch_sos', 'geofence_breach', 'manual_check_in'] &&
+             data.status in ['active', 'acknowledged', 'resolved', 'false_alarm'] &&
+             isValidLatLng(data.latitude, data.longitude) &&
+             data.accuracyMeters is number && data.accuracyMeters >= 0 && data.accuracyMeters <= 10000 &&
+             data.batteryPercent is int && data.batteryPercent >= 0 && data.batteryPercent <= 100 &&
+             data.sirenTriggered is bool &&
+             data.shareId is string && data.shareId.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // --- ADMIN ROLE LOOKUP (READ-ONLY FROM CLIENT) ---
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && request.auth.uid == adminUid;
+      allow list, create, update, delete: if false;
+    }
+
+    // --- PRIVATE USER PROFILE & SUBCOLLECTIONS ---
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isAdmin();
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'sosAutoSiren', 'locationSharingEnabled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'phone', 'bloodType', 'medicalNotes', 'homeAddress', 'emergencyPinHash', 'sosAutoSiren', 'locationSharingEnabled', 'fcmToken', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'phone', 'bloodType', 'medicalNotes', 'homeAddress', 'emergencyPinHash', 'sosAutoSiren', 'locationSharingEnabled', 'fcmToken', 'updatedAt']);
+
+      allow delete: if isOwner(userId);
+
+      // Emergency Contacts
+      match /emergency_contacts/{contactId} {
+        allow get, list: if isOwner(userId);
+        allow delete: if isOwner(userId) && isValidId(contactId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(contactId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'relationship', 'phone', 'isPrimary', 'notifyOnSos', 'notifyOnGeofence', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'relationship', 'phone', 'email', 'isPrimary', 'notifyOnSos', 'notifyOnGeofence', 'createdAt', 'updatedAt']) &&
+                         isValidEmergencyContact(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(contactId) &&
+                         isValidEmergencyContact(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'relationship', 'phone', 'email', 'isPrimary', 'notifyOnSos', 'notifyOnGeofence', 'updatedAt']);
+      }
+
+      // Geofences
+      match /geofences/{geofenceId} {
+        allow get, list: if isOwner(userId);
+        allow delete: if isOwner(userId) && isValidId(geofenceId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(geofenceId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'zoneType', 'latitude', 'longitude', 'radiusMeters', 'isActive', 'notifyOnEnter', 'notifyOnExit', 'lastEvent', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'zoneType', 'latitude', 'longitude', 'radiusMeters', 'isActive', 'notifyOnEnter', 'notifyOnExit', 'lastEvent', 'createdAt', 'updatedAt']) &&
+                         isValidGeofence(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(geofenceId) &&
+                         isValidGeofence(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'zoneType', 'latitude', 'longitude', 'radiusMeters', 'isActive', 'notifyOnEnter', 'notifyOnExit', 'lastEvent', 'updatedAt']);
+      }
+
+      // SOS Incidents (Private User History)
+      match /sos_incidents/{incidentId} {
+        allow get, list: if isOwner(userId) || isAdmin();
+        allow delete: if isAdmin() && isValidId(incidentId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(incidentId) &&
+                         incoming().status == 'active' &&
+                         incoming().keys().hasAll(['userId', 'triggerType', 'status', 'latitude', 'longitude', 'accuracyMeters', 'addressLabel', 'sirenTriggered', 'batteryPercent', 'notes', 'evidenceCount', 'shareCode', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'triggerType', 'status', 'latitude', 'longitude', 'accuracyMeters', 'addressLabel', 'sirenTriggered', 'batteryPercent', 'notes', 'evidenceCount', 'shareCode', 'createdAt', 'updatedAt', 'resolvedAt']) &&
+                         isValidSosIncident(incoming(), userId);
+
+        allow update: if isSignedIn() &&
+                         isValidId(incidentId) &&
+                         isValidSosIncident(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt && (
+                           isAdmin() || (
+                             isOwner(userId) &&
+                             existing().status != 'resolved' &&
+                             existing().status != 'false_alarm' &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['status', 'latitude', 'longitude', 'accuracyMeters', 'addressLabel', 'sirenTriggered', 'batteryPercent', 'notes', 'evidenceCount', 'updatedAt', 'resolvedAt'])
+                           )
+                         );
+
+        // Append-only GPS Breadcrumbs
+        match /location_breadcrumbs/{crumbId} {
+          allow get, list: if isOwner(userId) || isAdmin();
+          allow create: if isOwner(userId) &&
+                           isValidId(crumbId) &&
+                           incoming().keys().hasAll(['userId', 'incidentId', 'latitude', 'longitude', 'speedMps', 'accuracyMeters', 'batteryPercent', 'recordedAt']) &&
+                           incoming().keys().hasOnly(['userId', 'incidentId', 'latitude', 'longitude', 'speedMps', 'accuracyMeters', 'batteryPercent', 'recordedAt']) &&
+                           isValidLocationBreadcrumb(incoming(), userId, incidentId);
+          allow update, delete: if false;
+        }
+      }
+
+      // Consent-based Encrypted Evidence Records
+      match /evidence_records/{evidenceId} {
+        allow get, list: if isOwner(userId);
+        allow delete: if isOwner(userId) && isValidId(evidenceId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(evidenceId) &&
+                         incoming().keys().hasAll(['userId', 'incidentId', 'captureMode', 'title', 'summary', 'localEncryptedUri', 'storagePath', 'sha256Digest', 'encryptionAlgo', 'consentConfirmed', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'incidentId', 'captureMode', 'title', 'summary', 'localEncryptedUri', 'storagePath', 'sha256Digest', 'encryptionAlgo', 'consentConfirmed', 'createdAt']) &&
+                         isValidEvidenceRecord(incoming(), userId);
+        allow update: if false;
+      }
+    }
+
+    // --- LIVE LOCATION SHARE BEACONS ---
+    match /live_shares/{shareId} {
+      allow get: if isSignedIn() && isValidId(shareId) && (existing().ownerId == request.auth.uid || existing().isActive == true || isAdmin());
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(shareId) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerId', 'ownerAlias', 'incidentId', 'isActive', 'latitude', 'longitude', 'accuracyMeters', 'batteryPercent', 'statusMessage', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'ownerAlias', 'incidentId', 'isActive', 'latitude', 'longitude', 'accuracyMeters', 'batteryPercent', 'statusMessage', 'createdAt', 'updatedAt']) &&
+                       isValidLiveShareBeacon(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(shareId) &&
+                       isValidLiveShareBeacon(incoming()) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().incidentId == existing().incidentId &&
+                       incoming().createdAt == existing().createdAt && (
+                         isAdmin() || (
+                           existing().ownerId == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['isActive', 'latitude', 'longitude', 'accuracyMeters', 'batteryPercent', 'statusMessage', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(shareId) && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // --- CROWDSOURCED DANGER ZONES ---
+    match /danger_zones/{zoneId} {
+      allow get: if isSignedIn() && isValidId(zoneId) && (existing().verificationStatus == 'verified' || existing().reporterId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.verificationStatus == 'verified' || resource.data.reporterId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(zoneId) &&
+                       incoming().reporterId == request.auth.uid &&
+                       incoming().verificationStatus == 'pending' &&
+                       incoming().confirmCount == 1 &&
+                       incoming().keys().hasAll(['reporterId', 'reporterAlias', 'title', 'description', 'category', 'severity', 'latitude', 'longitude', 'radiusMeters', 'verificationStatus', 'confirmCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['reporterId', 'reporterAlias', 'title', 'description', 'category', 'severity', 'latitude', 'longitude', 'radiusMeters', 'verificationStatus', 'confirmCount', 'createdAt', 'updatedAt']) &&
+                       isValidDangerZone(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(zoneId) &&
+                       isValidDangerZone(incoming()) &&
+                       incoming().reporterId == existing().reporterId &&
+                       incoming().createdAt == existing().createdAt && (
+                         isAdmin() ||
+                         (
+                           existing().verificationStatus == 'verified' &&
+                           incoming().confirmCount == existing().confirmCount + 1 &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['confirmCount', 'updatedAt'])
+                         ) ||
+                         (
+                           existing().reporterId == request.auth.uid &&
+                           existing().verificationStatus == 'pending' &&
+                           incoming().verificationStatus == 'pending' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'category', 'severity', 'latitude', 'longitude', 'radiusMeters', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(zoneId) && ((existing().reporterId == request.auth.uid && existing().verificationStatus == 'pending') || isAdmin());
+    }
+
+    // --- VERIFIED SAFE PLACES ---
+    match /safe_places/{placeId} {
+      allow get: if isSignedIn() && isValidId(placeId) && (existing().verifiedByAdmin == true || isAdmin());
+      allow list: if isSignedIn() && (resource.data.verifiedByAdmin == true || isAdmin());
+
+      allow create: if isAdmin() &&
+                       isValidId(placeId) &&
+                       incoming().createdBy == request.auth.uid &&
+                       incoming().keys().hasAll(['name', 'category', 'address', 'phone', 'latitude', 'longitude', 'isOpen24Hours', 'verifiedByAdmin', 'createdBy', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'category', 'address', 'phone', 'latitude', 'longitude', 'isOpen24Hours', 'verifiedByAdmin', 'createdBy', 'createdAt', 'updatedAt']) &&
+                       isValidSafePlace(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(placeId) &&
+                       isValidSafePlace(incoming()) &&
+                       incoming().createdBy == existing().createdBy &&
+                       incoming().createdAt == existing().createdAt;
+
+      allow delete: if isAdmin() && isValidId(placeId);
+    }
+
+    // --- ADMIN EMERGENCY FEED (SANITIZED SUMMARY) ---
+    match /sos_global_alerts/{alertId} {
+      allow get: if isSignedIn() && isValidId(alertId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(alertId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'active' &&
+                       incoming().keys().hasAll(['incidentId', 'userId', 'userAlias', 'triggerType', 'status', 'latitude', 'longitude', 'accuracyMeters', 'batteryPercent', 'sirenTriggered', 'shareId', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['incidentId', 'userId', 'userAlias', 'triggerType', 'status', 'latitude', 'longitude', 'accuracyMeters', 'batteryPercent', 'sirenTriggered', 'shareId', 'createdAt', 'updatedAt']) &&
+                       isValidSosGlobalAlert(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(alertId) &&
+                       isValidSosGlobalAlert(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().incidentId == existing().incidentId &&
+                       incoming().createdAt == existing().createdAt && (
+                         isAdmin() || (
+                           existing().userId == request.auth.uid &&
+                           existing().status != 'resolved' &&
+                           existing().status != 'false_alarm' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'latitude', 'longitude', 'accuracyMeters', 'batteryPercent', 'sirenTriggered', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isAdmin() && isValidId(alertId);
+    }
+  }
+}
